@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reaktiomestari Pro</title>
+
+<style>
+
+body{
+    margin:0;
+    background:linear-gradient(135deg,#0f172a,#1e293b);
+    color:white;
+    font-family:Segoe UI,sans-serif;
+    text-align:center;
+}
+
+.container{
+    max-width:900px;
+    margin:auto;
+    padding:20px;
+}
+
+h1{
+    color:#38bdf8;
+    text-shadow:0 0 15px #38bdf8;
+}
+
+button{
+    padding:12px 18px;
+    border:none;
+    border-radius:10px;
+    background:#0ea5e9;
+    color:white;
+    cursor:pointer;
+    font-size:16px;
+}
+
+button:hover{
+    background:#0284c7;
+}
+
+#game{
+    width:320px;
+    height:320px;
+    margin:20px auto;
+    border-radius:25px;
+    background:#ef4444;
+    box-shadow:0 0 30px #ef4444;
+    cursor:pointer;
+    transition:0.2s;
+}
+
+.card{
+    display:inline-block;
+    padding:12px 18px;
+    margin:6px;
+    border-radius:12px;
+    background:rgba(255,255,255,0.08);
+}
+
+#msg{
+    font-size:1.3rem;
+    margin:15px;
+}
+
+#top{
+    text-align:left;
+    width:200px;
+    margin:auto;
+}
+
+.particle{
+    position:fixed;
+    pointer-events:none;
+    font-size:24px;
+    animation:fly 1s forwards;
+}
+
+@keyframes fly{
+
+    from{
+        transform:translateY(0);
+        opacity:1;
+    }
+
+    to{
+        transform:translateY(-120px);
+        opacity:0;
+    }
+
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>⚡ Reaktiomestari Pro</h1>
+
+<button onclick="startCountdown()">
+Aloita peli
+</button>
+
+<div id="msg">
+Paina Aloita
+</div>
+
+<div id="game"></div>
+
+<div>
+
+<span class="card">
+Pisteet:
+<span id="score">0</span>
+</span>
+<span class="card">
+Combo:
+<span id="combo">0</span>
+</span>
+
+<span class="card">
+Elämät:
+<span id="lives">❤️❤️❤️</span>
+</span>
+
+<span class="card">
+Paras aika:
+<span id="best">-</span>
+</span>
+
+</div>
+
+<h3>🏆 Top 10</h3>
+
+<ol id="top"></ol>
+
+</div>
+
+<script>
+
+const game =
+document.getElementById("game");
+
+const msg =
+document.getElementById("msg");
+
+let ready = false;
+let waiting = false;
+let startTime = 0;
+
+let score = 0;
+let combo = 0;
+let lives = 3;
+
+let best =
+localStorage.getItem(
+"bestReaction"
+);
+
+if(best){
+
+    document
+    .getElementById("best")
+    .textContent =
+    best + " ms";
+
+}
+
+function updateStats(){
+
+    document
+    .getElementById("score")
+    .textContent = score;
+
+    document
+    .getElementById("combo")
+    .textContent = combo;
+
+    document
+    .getElementById("lives")
+    .textContent =
+    "❤️".repeat(lives);
+
+}
+
+function playSound(
+frequency,
+duration
+){
+
+    const audioContext =
+    new(
+        window.AudioContext ||
+        window.webkitAudioContext
+    )();
+
+    const oscillator =
+    audioContext
+    .createOscillator();
+
+    const gainNode =
+    audioContext
+    .createGain();
+
+    oscillator
+    .frequency
+    .value =
+    frequency;
+
+    oscillator
+    .connect(gainNode);
+
+    gainNode
+    .connect(
+        audioContext
+        .destination
+    );
+
+    gainNode
+    .gain
+    .value = 0.10;
+
+    oscillator.start();
+
+    oscillator.stop(
+        audioContext.currentTime +
+        duration / 1000
+    );
+
+}
+
+function createParticle(){
+
+    const particle =
+    document
+    .createElement("div");
+
+    particle.className =
+    "particle";
+
+    particle.innerHTML =
+    "⭐";
+
+    particle.style.left =
+ (
+        window.innerWidth / 2
+        +
+        Math.random() * 100
+        -
+        50
+    ) + "px";
+
+    particle.style.top =
+    "250px";
+
+    document.body
+    .appendChild(
+        particle
+    );
+
+    setTimeout(
+        () => particle.remove(),
+        1000
+    );
+
+}
+
+function renderTop(){
+
+    let results =
+    JSON.parse(
+
+        localStorage
+        .getItem("top10")
+
+        ||
+
+        "[]"
+
+    );
+
+    document
+    .getElementById("top")
+    .innerHTML =
+
+    results.map(
+
+        value =>
+
+        "<li>" +
+        value +
+        " ms</li>"
+
+    ).join("");
+
+}
+
+function startCountdown(){
+
+    let count = 3;
+
+    msg.textContent =
+    "Valmistaudu: "
+    + count;
+
+    const timer =
+
+    setInterval(
+
+        () => {
+
+            count--;
+
+            if(
+                count > 0
+            ){
+
+                msg.textContent =
+                "Valmistaudu: "
+                + count;
+
+            }
+            else{
+
+                clearInterval(
+                    timer
+                );
+
+                startRound();
+
+            }
+
+        },
+
+        1000
+
+    );
+
+}
+
+function startRound(){
+
+    const delay =
+
+    Math.random()
+    * 2500
+    + 800;
+
+    waiting = true;
+    ready = false;
+
+    msg.textContent =
+    "Odota vihreää...";
+
+    game.style.background =
+    "#ef4444";
+
+    game.style.boxShadow =
+    "0 0 30px #ef4444";
+
+    setTimeout(
+
+        () => {
+
+            waiting = false;
+            ready = true;
+
+            game.style.background =
+            "#22c55e";
+
+            game.style.boxShadow =
+            "0 0 40px #22c55e";
+
+            msg.textContent =
+            "KLIKKAUS NYT!";
+
+            startTime =
+            Date.now();
+
+        },
+
+        delay
+
+    );
+
+}
+game.addEventListener(
+
+    "click",
+
+    () => {
+
+        if(ready){
+
+            const reactionTime =
+
+            Date.now()
+            -
+            startTime;
+
+            playSound(
+                900,
+                120
+            );
+
+            createParticle();
+
+            let points =
+
+            Math.max(
+
+                1,
+
+                5 -
+
+                Math.floor(
+                    reactionTime
+                    /
+                    150
+                )
+
+            );
+
+            score += points;
+
+            combo++;
+
+            msg.textContent =
+
+            "⚡ Reaktioaika: "
+            +
+            reactionTime
+            +
+            " ms";
+
+            if(
+
+                !best
+
+                ||
+
+                reactionTime
+                <
+                best
+
+            ){
+
+                best =
+                reactionTime;
+
+                localStorage
+                .setItem(
+
+                    "bestReaction",
+
+                    reactionTime
+
+                );
+
+                document
+                .getElementById(
+                    "best"
+                )
+                .textContent =
+
+                reactionTime
+                +
+                " ms";
+
+            }
+
+            let results =
+
+            JSON.parse(
+
+                localStorage
+                .getItem(
+                    "top10"
+                )
+
+                ||
+
+                "[]"
+
+            );
+
+            results.push(
+                reactionTime
+            );
+
+            results.sort(
+
+                (a,b) => a - b
+
+            );
+
+            results =
+            results.slice(
+                0,
+                10
+            );
+
+            localStorage
+            .setItem(
+
+                "top10",
+
+                JSON.stringify(
+                    results
+                )
+
+            );
+
+            renderTop();
+
+            updateStats();
+
+            setTimeout(
+
+                startRound,
+
+                800
+
+            );
+
+            ready = false;
+
+        }
+
+        else if(waiting){
+
+            playSound(
+                220,
+                250
+            );
+
+            lives--;
+
+            combo = 0;
+
+            updateStats();
+
+            msg.textContent =
+
+            "❌ Liian aikaisin!";
+
+            waiting = false;
+
+            if(
+                lives <= 0
+            ){
+  playSound(
+                    120,
+                    500
+                );
+
+                msg.textContent =
+
+                "💀 Peli päättyi! "
+                +
+                "Pisteesi: "
+                +
+                score;
+
+                score = 0;
+                combo = 0;
+                lives = 3;
+
+                updateStats();
+
+            }
+
+        }
+
+    }
+
+);
+
+updateStats();
+
+renderTop();
+
+</script>
+
+</body>
+
+</html>
